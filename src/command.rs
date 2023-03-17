@@ -1,5 +1,6 @@
+use std::fmt::Display;
+
 use chess_lib::{packet::Packet, opcode::Opcode};
-use serde::de::IntoDeserializer;
 
 pub struct Command {
     id: Opcode,
@@ -19,6 +20,31 @@ pub fn check_len(str: &Vec<&str>, len: usize, cmd: &str) -> Result<(), String> {
     Ok(())
 }
 
+impl Display for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = format!("{}", self.id);
+        match &self.arg {
+            Some(arg) => {
+                let arg_str = match arg {
+                    Argument::Bool(b) => {
+                        if *b {
+                            "true".to_string()
+                        } else {
+                            "false".to_string()
+                        }
+                    },
+                    Argument::Int32(i) => i.to_string(),
+                    Argument::String(s) => s.to_string()
+                };
+                write!(f, "{} {}", str, arg_str)
+            }
+            None => {
+                write!(f, "{}", str)
+            }
+        }
+    }
+}
+
 impl Command {
     pub fn new(id: Opcode, arg: Argument) -> Self {
         Command {
@@ -34,6 +60,7 @@ impl Command {
         }
     }
 
+    // create packet from a command
     pub fn build_packet(&self) -> (Packet, bool) {
         let pl = match &self.arg {
             None => vec![],
@@ -50,6 +77,7 @@ impl Command {
         (Packet::new_prim(self.id.clone(), pl), req_resp)
     }
 
+    // create a command from a vector of strings
     pub fn from_strings(strs: Vec<&str>) -> Result<Self, String> {
         match strs[0] {
             "join" => {
@@ -72,6 +100,19 @@ impl Command {
                     Err(e) => Err(e.to_string())
                 }
             },
+            "show_game" => {
+                Ok(Command::new_no_arg(Opcode::ShowGame))
+            }
+            "list_games" => {
+                Ok(Command::new_no_arg(Opcode::ListGames))
+            },
+            "leave_game" => {
+                Ok(Command::new_no_arg(Opcode::LeaveGame))
+            },
+            "send_move" => {
+                check_len(&strs, 2, "send__move")?;
+                Ok(Command::new(Opcode::SendMove, Argument::String(strs[1].to_string())))
+            }
             _ => Err("Invalid command.".to_string())
         }
     }
